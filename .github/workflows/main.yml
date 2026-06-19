@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🛠️ Prepare Treble Vendor
+      - name: 🛠️ Prepare Vendor
         run: |
           mkdir -p vendor_package/vendor
           cp -r proprietary/* vendor_package/vendor/
@@ -31,16 +31,8 @@ jobs:
         </manifest>
         EOF
           fi
+          
           cp manifest.xml vendor_package/
-          
-          if ! grep -q "PRODUCT_FULL_TREBLE_OVERRIDE" BoardConfigVendor.mk 2>/dev/null; then
-            echo "PRODUCT_FULL_TREBLE_OVERRIDE := true" >> BoardConfigVendor.mk
-            echo "PRODUCT_VENDOR_MOVE_ENABLED := true" >> BoardConfigVendor.mk
-            echo "BOARD_VNDK_VERSION := current" >> BoardConfigVendor.mk
-          fi
-          cp BoardConfigVendor.mk vendor_package/
-          cp on7xreflte-vendor.mk vendor_package/ 2>/dev/null || true
-          
           cd vendor_package
           zip -r ../vendor.zip *
           cd ..
