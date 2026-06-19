@@ -1,0 +1,81 @@
+name: 🚀 Final Build - Treble Vendor + ArrowOS 13.1 GSI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Vendor'u Hazırla
+      - name: 🛠️ Prepare Treble Vendor
+        run: |
+          mkdir -p vendor_package/vendor
+          cp -r proprietary/* vendor_package/vendor/
+          
+          if [ ! -f manifest.xml ]; then
+            cat > manifest.xml << 'EOF'
+        <manifest version="1.0" type="device">
+          <hal format="hidl">
+            <name>android.hardware.camera.provider</name>
+            <version>2.4</version>
+            <interface>
+              <name>ICameraProvider</name>
+              <instance>default</instance>
+            </interface>
+          </hal>
+        </manifest>
+        EOF
+          fi
+          cp manifest.xml vendor_package/
+          
+          if ! grep -q "PRODUCT_FULL_TREBLE_OVERRIDE" BoardConfigVendor.mk 2>/dev/null; then
+            echo "PRODUCT_FULL_TREBLE_OVERRIDE := true" >> BoardConfigVendor.mk
+            echo "PRODUCT_VENDOR_MOVE_ENABLED := true" >> BoardConfigVendor.mk
+            echo "BOARD_VNDK_VERSION := current" >> BoardConfigVendor.mk
+          fi
+          cp BoardConfigVendor.mk vendor_package/
+          cp on7xreflte-vendor.mk vendor_package/ 2>/dev/null || true
+          
+          cd vendor_package
+          zip -r ../vendor.zip *
+          cd ..
+
+      # 2. ArrowOS GSI'yı İndir (Senin verdiğin link ile)
+      - name: 📥 Download ArrowOS 13.1 GSI
+        run: |
+          GSI_URL="https://github.com/naz664/ArrowOS_gsi/releases/download/v2023.10.28/ArrowOS-13.1-arm64_bgN-Unofficial.img.xz"
+          echo "⏳ İndiriliyor: $GSI_URL"
+          
+          # İndirme başarısız olursa hata ver ve durdur
+          if ! wget -O gsi.img.xz $GSI_URL; then
+            echo "❌ İndirme başarısız! Linki kontrol et: $GSI_URL"
+            exit 1
+          fi
+          
+          # Sıkıştırılmış dosyayı aç
+          unxz gsi.img.xz
+          mv gsi.img system.img
+          echo "✅ system.img başarıyla oluşturuldu."
+
+      # 3. Her Şeyi Tek Zip'te Paketle
+      - name: 📦 Package Everything
+        run: |
+          mkdir -p release
+          cp vendor.zip release/
+          cp system.img release/
+          cd release
+          zip -r ../SM-G611F_ArrowOS13_Treble.zip *
+          cd ..
+
+      # 4. Sonucu Yükle
+      - name: ⬆️ Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SM-G611F_ArrowOS13_Treble
+          path: SM-G611F_ArrowOS13_Treble.zip
